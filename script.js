@@ -1,314 +1,42 @@
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-
-const scoreEl = document.getElementById('score');
-const livesEl = document.getElementById('lives');
-const startBtn = document.getElementById('startBtn');
-const restartBtn = document.getElementById('restartBtn');
-
-const WIDTH = canvas.width;
-const HEIGHT = canvas.height;
-
-let gameLoopId = null;
-let lastTime = 0;
-let spawnTimer = 0;
-let animationId = null;
-let gameRunning = false;
-let gameOver = false;
-
-const keys = {
-  left: false,
-  right: false,
-  shoot: false,
-};
-
-const player = {
-  x: WIDTH / 2 - 22,
-  y: HEIGHT - 70,
-  width: 44,
-  height: 26,
-  speed: 260,
-  cooldown: 0,
-};
-
-let bullets = [];
-let enemies = [];
-let stars = [];
-let score = 0;
-let lives = 3;
-
-function generateStars() {
-  stars = Array.from({ length: 90 }, () => ({
-    x: Math.random() * WIDTH,
-    y: Math.random() * HEIGHT,
-    radius: Math.random() * 2.1 + 0.8,
-    speed: Math.random() * 45 + 30,
-  }));
-}
-
-function resetGame() {
-  score = 0;
-  lives = 3;
-  bullets = [];
-  enemies = [];
-  player.x = WIDTH / 2 - player.width / 2;
-  player.y = HEIGHT - 70;
-  player.cooldown = 0;
-  scoreEl.textContent = String(score);
-  livesEl.textContent = String(lives);
-  gameOver = false;
-  generateStars();
-}
-
-function startGame() {
-  if (gameRunning) return;
-
-  resetGame();
-  gameRunning = true;
-  lastTime = 0;
-  spawnTimer = 0;
-  gameLoopId = requestAnimationFrame(gameUpdate);
-}
-
-function gameOverState() {
-  gameRunning = false;
-  gameOver = true;
-  cancelAnimationFrame(gameLoopId);
-  ctx.fillStyle = 'rgba(7, 11, 22, 0.6)';
-  ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 34px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText('OYUN BİTTİ', WIDTH / 2, HEIGHT / 2 - 16);
-  ctx.font = '22px Arial';
-  ctx.fillText(`Skor: ${score}`, WIDTH / 2, HEIGHT / 2 + 22);
-  ctx.font = '18px Arial';
-  ctx.fillStyle = '#8ec9ff';
-  ctx.fillText('Yeniden Başlat butonuna basın', WIDTH / 2, HEIGHT / 2 + 60);
-}
-
-function shoot() {
-  const bullet = {
-    x: player.x + player.width / 2 - 2,
-    y: player.y - 12,
-    width: 4,
-    height: 14,
-    speed: 420,
-  };
-  bullets.push(bullet);
-}
-
-function spawnEnemy() {
-  const size = 28 + Math.random() * 18;
-  const enemy = {
-    x: Math.random() * (WIDTH - size),
-    y: -size,
-    width: size,
-    height: size,
-    speed: 120 + Math.random() * 60,
-    drift: (Math.random() - 0.5) * 60,
-  };
-  enemies.push(enemy);
-}
-
-function updatePlayer(deltaTime) {
-  player.cooldown = Math.max(0, player.cooldown - deltaTime);
-
-  if (keys.left) {
-    player.x -= player.speed * deltaTime;
-  }
-  if (keys.right) {
-    player.x += player.speed * deltaTime;
-  }
-
-  player.x = Math.max(0, Math.min(WIDTH - player.width, player.x));
-
-  if (keys.shoot && player.cooldown === 0) {
-    shoot();
-    player.cooldown = 0.22;
-  }
-}
-
-function updateBullets(deltaTime) {
-  bullets = bullets.filter((bullet) => {
-    bullet.y -= bullet.speed * deltaTime;
-    return bullet.y + bullet.height > 0;
-  });
-}
-
-function updateEnemies(deltaTime) {
-  spawnTimer += deltaTime;
-  if (spawnTimer > 0.9) {
-    spawnEnemy();
-    spawnTimer = 0;
-  }
-
-  enemies.forEach((enemy) => {
-    enemy.y += enemy.speed * deltaTime;
-    enemy.x += enemy.drift * deltaTime;
-  });
-
-  enemies = enemies.filter((enemy) => enemy.y < HEIGHT + enemy.height);
-}
-
-function checkCollisions() {
-  for (let i = bullets.length - 1; i >= 0; i -= 1) {
-    const bullet = bullets[i];
-
-    for (let j = enemies.length - 1; j >= 0; j -= 1) {
-      const enemy = enemies[j];
-
-      if (
-        bullet.x < enemy.x + enemy.width &&
-        bullet.x + bullet.width > enemy.x &&
-        bullet.y < enemy.y + enemy.height &&
-        bullet.y + bullet.height > enemy.y
-      ) {
-        bullets.splice(i, 1);
-        enemies.splice(j, 1);
-        score += 10;
-        scoreEl.textContent = String(score);
-        break;
-      }
-    }
-  }
-
-  for (let i = enemies.length - 1; i >= 0; i -= 1) {
-    const enemy = enemies[i];
-
-    if (
-      player.x < enemy.x + enemy.width &&
-      player.x + player.width > enemy.x &&
-      player.y < enemy.y + enemy.height &&
-      player.y + player.height > enemy.y
-    ) {
-      enemies.splice(i, 1);
-      lives -= 1;
-      livesEl.textContent = String(lives);
-
-      if (lives <= 0) {
-        gameOverState();
-        return;
-      }
-    }
-  }
-}
-
-function updateStars(deltaTime) {
-  stars.forEach((star) => {
-    star.y += star.speed * deltaTime;
-    if (star.y > HEIGHT) {
-      star.y = -5;
-      star.x = Math.random() * WIDTH;
-    }
-  });
-}
-
-function gameUpdate(timestamp) {
-  if (!gameRunning) return;
-
-  if (!lastTime) lastTime = timestamp;
-  const deltaTime = (timestamp - lastTime) / 1000;
-  lastTime = timestamp;
-
-  updatePlayer(deltaTime);
-  updateBullets(deltaTime);
-  updateEnemies(deltaTime);
-  updateStars(deltaTime);
-  checkCollisions();
-  draw();
-
-  if (gameRunning) {
-    animationId = requestAnimationFrame(gameUpdate);
-  }
-}
-
-function drawPlayer() {
-  ctx.save();
-  ctx.translate(player.x + player.width / 2, player.y + player.height / 2);
-
-  ctx.fillStyle = '#63d5ff';
-  ctx.beginPath();
-  ctx.moveTo(0, -player.height / 2);
-  ctx.lineTo(player.width / 2, player.height / 2);
-  ctx.lineTo(0, player.height / 4);
-  ctx.lineTo(-player.width / 2, player.height / 2);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.fillStyle = '#ffd166';
-  ctx.fillRect(-4, 6, 8, 12);
-
-  ctx.restore();
-}
-
-function drawBullets() {
-  ctx.fillStyle = '#f8f9ff';
-  bullets.forEach((bullet) => {
-    ctx.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
-  });
-}
-
-function drawEnemies() {
-  enemies.forEach((enemy) => {
-    ctx.fillStyle = '#ff6b6b';
-    ctx.fillRect(enemy.x, enemy.y, enemy.width, enemy.height);
-
-    ctx.fillStyle = '#ffb3b3';
-    ctx.fillRect(enemy.x + 5, enemy.y + 8, enemy.width - 10, 9);
-  });
-}
-
-function drawStars() {
-  stars.forEach((star) => {
-    ctx.fillStyle = '#dfe9ff';
-    ctx.beginPath();
-    ctx.arc(star.x, star.y, star.radius, 0, Math.PI * 2);
-    ctx.fill();
-  });
-}
-
-function draw() {
-  ctx.clearRect(0, 0, WIDTH, HEIGHT);
-  drawStars();
-  drawBullets();
-  drawEnemies();
-  drawPlayer();
-}
-
-window.addEventListener('keydown', (event) => {
-  if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a') {
-    keys.left = true;
-  }
-  if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') {
-    keys.right = true;
-  }
-  if (event.code === 'Space') {
-    event.preventDefault();
-    keys.shoot = true;
-  }
-});
-
-window.addEventListener('keyup', (event) => {
-  if (event.key === 'ArrowLeft' || event.key.toLowerCase() === 'a') {
-    keys.left = false;
-  }
-  if (event.key === 'ArrowRight' || event.key.toLowerCase() === 'd') {
-    keys.right = false;
-  }
-  if (event.code === 'Space') {
-    keys.shoot = false;
-  }
-});
-
-startBtn.addEventListener('click', () => {
-  startGame();
-});
-
-restartBtn.addEventListener('click', () => {
-  if (gameLoopId) cancelAnimationFrame(gameLoopId);
-  startGame();
-});
-
-resetGame();
-draw();
+const canvas=document.getElementById('gameCanvas');
+const ctx=canvas.getContext('2d');
+const $=(id)=>document.getElementById(id);
+const WIDTH=canvas.width,HEIGHT=canvas.height;
+const STORAGE={best:'starFleetBestV1',profile:'starFleetProfileV1',friends:'starFleetFriendsV1',sound:'starFleetSoundV1',notice:'starFleetNoticeV1'};
+const safeRead=(key,fallback)=>{try{const value=localStorage.getItem(key);return value===null?fallback:JSON.parse(value)}catch{return fallback}};
+const safeWrite=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch{showToast('Tarayıcı kayıt alanına erişilemedi.')}};
+let score=0,lives=3,bestScore=Number(safeRead(STORAGE.best,0))||0,level=1,spawnTimer=0,lastTime=0,rafId=0,gameRunning=false,gameState='ready',soundOn=safeRead(STORAGE.sound,true)!==false,audioContext=null,toastTimer=0;
+let bullets=[],enemies=[],stars=[];
+const keys={left:false,right:false,shoot:false};
+const player={x:WIDTH/2-22,y:HEIGHT-70,width:44,height:30,speed:270,cooldown:0,invulnerable:0};
+const scoreEl=$('score'),livesEl=$('lives'),bestEl=$('bestScore'),overlay=$('gameOverlay');
+function formatScore(value){return String(value).padStart(5,'0')}
+function showToast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2800)}
+function playTone(freq=500,duration=.08,type='sine',volume=.035){if(!soundOn)return;try{audioContext=audioContext||new(window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')audioContext.resume();const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=type;osc.frequency.value=freq;gain.gain.setValueAtTime(volume,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+duration);osc.connect(gain);gain.connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+duration)}catch{}}
+function updateScoreUI(){scoreEl.textContent=formatScore(score);const next=level*100,progress=score%100;$('levelLabel').textContent=String(level);$('sideLevel').textContent=String(level);$('sideBest').textContent=String(bestScore);$('levelProgress').style.width=`${progress}%`;$('nextLevelText').textContent=`${next-progress} puan`;bestEl.textContent=formatScore(bestScore)}
+function makeStars(){stars=Array.from({length:95},()=>({x:Math.random()*WIDTH,y:Math.random()*HEIGHT,r:Math.random()*1.7+.35,speed:25+Math.random()*75,alpha:.25+Math.random()*.75}))}
+function resetGame(){score=0;lives=3;level=1;bullets=[];enemies=[];spawnTimer=0;player.x=WIDTH/2-player.width/2;player.cooldown=0;player.invulnerable=0;makeStars();scoreEl.textContent=formatScore(score);livesEl.textContent=String(lives);updateScoreUI();gameState='playing';overlay.classList.add('hidden');$('overlayEyebrow').textContent='PİLOT, HAZIR MISIN?';$('overlayTitle').textContent='Görev başlıyor';$('overlayText').textContent='Yön tuşlarıyla kaçın, boşlukla düşmanları vur.';draw()}
+function startGame(){if(gameRunning)return;resetGame();gameRunning=true;lastTime=0;rafId=requestAnimationFrame(loop);playTone(540,.1,'triangle')}
+function endGame(){gameRunning=false;gameState='over';if(rafId)cancelAnimationFrame(rafId);if(score>bestScore){bestScore=score;safeWrite(STORAGE.best,bestScore);showToast('Yeni rekor! Harika uçuş pilot!');}updateScoreUI();draw();$('overlayEyebrow').textContent='GÖREV TAMAMLANDI';$('overlayTitle').textContent='Uçuş sona erdi';$('overlayText').textContent=`Skorun ${score}. Bir uçuş daha yapıp rekorunu kır!`;$('startBtn').innerHTML='<span>↻</span> TEKRAR UÇ';overlay.classList.remove('hidden');playTone(150,.35,'sawtooth',.04)}
+function spawnEnemy(){const size=26+Math.random()*20;enemies.push({x:Math.random()*(WIDTH-size),y:-size,width:size,height:size,speed:(85+Math.random()*42)*(1+(level-1)*.16),drift:(Math.random()-.5)*(28+level*5),phase:Math.random()*6})}
+function shoot(){bullets.push({x:player.x+player.width/2-2,y:player.y-10,width:4,height:14,speed:460})}
+function updatePlayer(dt){player.cooldown=Math.max(0,player.cooldown-dt);player.invulnerable=Math.max(0,player.invulnerable-dt);if(keys.left)player.x-=player.speed*dt;if(keys.right)player.x+=player.speed*dt;player.x=Math.max(5,Math.min(WIDTH-player.width-5,player.x));if(keys.shoot&&player.cooldown===0){shoot();player.cooldown=Math.max(.12,.25-(level-1)*.012);playTone(760,.045,'square',.012)}}
+function updateWorld(dt){stars.forEach(s=>{s.y+=s.speed*dt;if(s.y>HEIGHT){s.y=-2;s.x=Math.random()*WIDTH}});bullets=bullets.filter(b=>{b.y-=b.speed*dt;return b.y+b.height>0});spawnTimer+=dt;const interval=Math.max(.28,.92-(level-1)*.055);while(spawnTimer>=interval){spawnTimer-=interval;spawnEnemy()}enemies.forEach(e=>{e.y+=e.speed*dt;e.x+=e.drift*dt;if(e.x<0||e.x+e.width>WIDTH){e.drift*=-1;e.x=Math.max(0,Math.min(WIDTH-e.width,e.x))}})}
+function collides(a,b){return a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y}
+function checkCollisions(){for(let i=bullets.length-1;i>=0;i--){let hit=false;for(let j=enemies.length-1;j>=0;j--){if(collides(bullets[i],enemies[j])){bullets.splice(i,1);enemies.splice(j,1);score+=10;hit=true;playTone(260,.07,'triangle',.03);break}}if(hit)continue}for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(e.y>HEIGHT){enemies.splice(i,1);loseLife();continue}if(player.invulnerable===0&&collides(player,e)){enemies.splice(i,1);loseLife();if(!gameRunning)return}}const newLevel=Math.floor(score/100)+1;if(newLevel>level){level=newLevel;updateScoreUI();showLevelToast();playTone(900,.16,'triangle',.05)}if(score>bestScore){bestScore=score;bestEl.textContent=formatScore(bestScore);$('sideBest').textContent=String(bestScore)}}
+function loseLife(){lives--;livesEl.textContent=String(lives);player.invulnerable=1.1;playTone(110,.2,'sawtooth',.04);if(lives<=0)endGame()}
+let levelToastTimer=0;function showLevelToast(){const el=$('levelToast');el.textContent=`SEVİYE ${level}`;el.classList.add('show');clearTimeout(levelToastTimer);levelToastTimer=setTimeout(()=>el.classList.remove('show'),1500)}
+function loop(timestamp){if(!gameRunning)return;if(!lastTime)lastTime=timestamp;const dt=Math.min((timestamp-lastTime)/1000,.04);lastTime=timestamp;updatePlayer(dt);updateWorld(dt);checkCollisions();draw();if(gameRunning)rafId=requestAnimationFrame(loop)}
+function drawPlayer(){if(player.invulnerable>0&&Math.floor(player.invulnerable*12)%2===0)return;ctx.save();ctx.translate(player.x+player.width/2,player.y+player.height/2);ctx.shadowBlur=14;ctx.shadowColor='#69e0ff';ctx.fillStyle='#73e7ff';ctx.beginPath();ctx.moveTo(0,-player.height/2-4);ctx.lineTo(player.width/2,player.height/2);ctx.lineTo(0,player.height/2-7);ctx.lineTo(-player.width/2,player.height/2);ctx.closePath();ctx.fill();ctx.fillStyle='#eafaff';ctx.beginPath();ctx.ellipse(0,-2,4,8,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffbd68';ctx.shadowColor='#ff9155';ctx.beginPath();ctx.moveTo(-5,player.height/2-1);ctx.lineTo(0,player.height/2+9+Math.random()*4);ctx.lineTo(5,player.height/2-1);ctx.fill();ctx.restore()}
+function draw(){if(!ctx)return;ctx.clearRect(0,0,WIDTH,HEIGHT);const bg=ctx.createLinearGradient(0,0,0,HEIGHT);bg.addColorStop(0,'#071323');bg.addColorStop(1,'#122749');ctx.fillStyle=bg;ctx.fillRect(0,0,WIDTH,HEIGHT);stars.forEach(s=>{ctx.globalAlpha=s.alpha;ctx.fillStyle='#d9f3ff';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()});ctx.globalAlpha=1;bullets.forEach(b=>{ctx.shadowBlur=12;ctx.shadowColor='#6beaff';ctx.fillStyle='#c9faff';ctx.fillRect(b.x,b.y,b.width,b.height)});ctx.shadowBlur=0;enemies.forEach(e=>{ctx.save();ctx.translate(e.x+e.width/2,e.y+e.height/2);ctx.rotate(Math.sin(e.phase+e.y*.025)*.08);ctx.fillStyle='#ff668b';ctx.shadowBlur=12;ctx.shadowColor='#ff3e73';ctx.beginPath();ctx.moveTo(0,e.height/2);ctx.lineTo(-e.width/2,-e.height/2);ctx.lineTo(0,-e.height/4);ctx.lineTo(e.width/2,-e.height/2);ctx.closePath();ctx.fill();ctx.fillStyle='#ffd9e2';ctx.fillRect(-3,-e.height/3,6,6);ctx.restore()});drawPlayer();ctx.shadowBlur=0}
+function setKey(event,value){const key=event.key.toLowerCase();if(key==='arrowleft'||key==='a')keys.left=value;if(key==='arrowright'||key==='d')keys.right=value;if(event.code==='Space'){event.preventDefault();keys.shoot=value}}
+window.addEventListener('keydown',e=>{setKey(e,true);if(e.key==='Enter'&&!gameRunning&&gameState!=='playing')startGame()});window.addEventListener('keyup',e=>setKey(e,false));window.addEventListener('blur',()=>Object.keys(keys).forEach(k=>keys[k]=false));
+function bindHold(id,key){const button=$(id);const down=e=>{e.preventDefault();keys[key]=true;button.setPointerCapture?.(e.pointerId)};const up=e=>{e.preventDefault();keys[key]=false};button.addEventListener('pointerdown',down);['pointerup','pointercancel','lostpointercapture'].forEach(type=>button.addEventListener(type,up))}bindHold('leftBtn','left');bindHold('rightBtn','right');bindHold('fireBtn','shoot');
+$('startBtn').addEventListener('click',startGame);$('soundBtn').addEventListener('click',()=>{soundOn=!soundOn;safeWrite(STORAGE.sound,soundOn);$('soundBtn').textContent=soundOn?'♫ Ses açık':'♫ Ses kapalı';$('soundBtn').setAttribute('aria-pressed',String(soundOn));if(soundOn)playTone(600)});
+const profileDialog=$('profileDialog'),friendDialog=$('friendDialog'),notificationDialog=$('notificationDialog'),infoDialog=$('infoDialog');
+function getProfile(){return safeRead(STORAGE.profile,{name:'Pilot'})}function renderProfile(){const name=getProfile().name||'Pilot';$('profileLabel').textContent=name;$('avatar').textContent=name.trim().charAt(0).toUpperCase()||'P';$('pilotName').value=name==='Pilot'?'':name}renderProfile();$('profileBtn').addEventListener('click',()=>profileDialog.showModal());$('profileForm').addEventListener('submit',e=>{if(e.submitter?.classList.contains('close-button'))return;e.preventDefault();const name=$('pilotName').value.trim();if(!name)return;safeWrite(STORAGE.profile,{name});renderProfile();profileDialog.close();showToast(`Hoş geldin, ${name}!`)});$('googleSignInBtn').addEventListener('click',()=>showToast('Google Play Games girişi Android yapılandırması gerektirir.'));
+function renderFriends(){const list=$('friendsList'),friends=safeRead(STORAGE.friends,[]);list.replaceChildren();if(!friends.length){const empty=document.createElement('div');empty.className='empty-friends';empty.textContent='Ekibin burada görünecek';list.append(empty);return}friends.forEach(name=>{const row=document.createElement('div');row.className='friend-item';const avatar=document.createElement('span');avatar.className='friend-avatar';avatar.textContent=name.charAt(0).toUpperCase();const label=document.createElement('span');label.textContent=name;const status=document.createElement('span');status.className='friend-status';status.textContent='PİLOT';row.append(avatar,label,status);list.append(row)})}renderFriends();$('addFriendBtn').addEventListener('click',()=>friendDialog.showModal());$('friendForm').addEventListener('submit',e=>{if(e.submitter?.classList.contains('close-button'))return;e.preventDefault();const name=$('friendName').value.trim();if(!name)return;const friends=safeRead(STORAGE.friends,[]);if(friends.some(n=>n.toLowerCase()===name.toLowerCase())){showToast('Bu pilot zaten ekibinde.');return}friends.push(name);safeWrite(STORAGE.friends,friends);$('friendName').value='';friendDialog.close();renderFriends();showToast(`${name} ekibine eklendi.`)});
+$('notificationsBtn').addEventListener('click',()=>{notificationDialog.showModal();$('notificationStatus').textContent='Notification' in window?`Tarayıcı izni: ${Notification.permission}`:'Bu tarayıcı bildirimleri desteklemiyor.'});$('enableNotificationsBtn').addEventListener('click',async()=>{if(!('Notification'in window)){ $('notificationStatus').textContent='Tarayıcın bildirimleri desteklemiyor.';return}try{const permission=await Notification.requestPermission();$('notificationStatus').textContent=permission==='granted'?'Bildirim izni açık. Bu web demosu yalnızca yerel tarayıcı bildirimlerini destekler.':permission==='denied'?'İzin reddedildi. Tarayıcı ayarlarından değiştirebilirsin.':'İzin verilmedi.';if(permission==='granted'){safeWrite(STORAGE.notice,true);new Notification('Yıldız Filosu',{body:'Bildirimler açıldı, pilot. İyi uçuşlar!',icon:'./icon.svg'})}}catch{$('notificationStatus').textContent='Bildirimler yalnızca güvenli bağlantıda (HTTPS veya localhost) kullanılabilir.'}});
+$('playGamesBtn').addEventListener('click',()=>infoDialog.showModal());$('googleSignInBtn').addEventListener('click',()=>showToast('Google Play Games girişi Android yapılandırması gerektirir.'));
+const storedBest=Number(safeRead(STORAGE.best,0))||0;bestScore=storedBest;makeStars();updateScoreUI();$('soundBtn').textContent=soundOn?'♫ Ses açık':'♫ Ses kapalı';$('soundBtn').setAttribute('aria-pressed',String(soundOn));draw();
+if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./service-worker.js').catch(()=>{});

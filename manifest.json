@@ -1,0 +1,15 @@
+{
+  "name": "Yıldız Filosu",
+  "short_name": "Yıldız Filosu",
+  "description": "Yıldızların arasında uç, düşmanları vur ve rekorunu kır.",
+  "lang": "tr-TR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#07111f",
+  "background_color": "#07111f",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
