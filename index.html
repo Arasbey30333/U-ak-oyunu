@@ -1,49 +1,49 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="tr">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Shadow District</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <div class="game-shell">
-      <header class="topbar">
-        <div class="brand-wrap">
-          <span class="brand-badge">S</span>
-          <div>
-            <div class="eyebrow">OPEN CITY</div>
-            <h1>Shadow District</h1>
-          </div>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#08111d">
+  <title>Shadow District — Şehir Görevi</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="game-shell">
+    <header class="topbar">
+      <div class="brand"><span class="brand-icon">S</span><div><p>ÖZGÜN AÇIK ŞEHİR OYUNU</p><h1>Shadow District</h1></div></div>
+      <div class="pilot"><span class="pilot-avatar">K</span><span>Kaan <small>PİLOT</small></span></div>
+    </header>
+
+    <section class="hud" aria-label="Oyun durumu">
+      <div class="stat"><span>NAKİT</span><strong id="cash">$0</strong></div>
+      <div class="stat"><span>TAKİP</span><strong id="heat">0 / 5</strong></div>
+      <div class="stat"><span>SAĞLIK</span><strong><span id="hp">100</span>%</strong></div>
+      <div class="stat objective"><span>GÖREV</span><strong id="missionText">Paket noktasına git</strong></div>
+    </section>
+
+    <section class="game-frame" aria-label="Oyun alanı">
+      <canvas id="gameCanvas" width="920" height="560" aria-label="Shadow District oyun alanı" tabindex="0"></canvas>
+      <div class="screen-message" id="screenMessage">
+        <div class="message-card">
+          <span class="message-icon">✦</span>
+          <p class="kicker" id="messageKicker">GECE BAŞLIYOR</p>
+          <h2 id="messageTitle">Şehir seni bekliyor</h2>
+          <p id="messageText">Paket noktasına ulaş, görevleri tamamla ve polis takibinden kurtul.</p>
+          <button id="startBtn" type="button">ŞEHRİ KEŞFET <span>→</span></button>
         </div>
-        <div class="profile-box">
-          <span class="avatar">K</span>
-          <span>Kaan</span>
-        </div>
-      </header>
-
-      <div class="hud">
-        <div class="stat"><span>Cash</span><strong id="cash">$0</strong></div>
-        <div class="stat"><span>Heat</span><strong id="heat">0</strong></div>
-        <div class="stat"><span>HP</span><strong id="hp">100</strong></div>
-        <div class="stat"><span>Target</span><strong id="missionText">Find Package</strong></div>
       </div>
+      <div class="toast" id="toast" role="status" aria-live="polite"></div>
+      <div class="map-label">NOVA ŞEHRİ <span>● GÖREV</span></div>
+    </section>
 
-      <div class="canvas-wrap">
-        <canvas id="gameCanvas" width="920" height="560"></canvas>
-        <div class="mission-toast" id="toast"></div>
-      </div>
-
-      <div class="controls">
-        <div class="keys">
-          <span>Move: WASD / Arrows</span>
-          <span>Enter Car: E</span>
-          <span>Boost: Shift</span>
-        </div>
-        <button id="startBtn" type="button">Start Mission</button>
-      </div>
-    </div>
-
-    <script src="script.js"></script>
-  </body>
+    <footer class="controls">
+      <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <span>veya ok tuşlarıyla hareket</span></div>
+      <div><kbd>E</kbd> <span>arabaya bin / in</span></div>
+      <div><kbd>SHIFT</kbd> <span>hızlan</span></div>
+      <button id="restartBtn" type="button">↻ Baştan başla</button>
+    </footer>
+    <p class="footnote">Bu, özgün karakterler ve şehir içeren bağımsız bir 2D tarayıcı oyunudur.</p>
+  </main>
+  <script src="script.js" defer></script>
+</body>
 </html>
