@@ -8,136 +8,108 @@ const missionTextEl = document.getElementById('missionText');
 const startBtn = document.getElementById('startBtn');
 const toastEl = document.getElementById('toast');
 
-const world = {
-  width: 2000,
-  height: 1500,
-};
-
-const keys = {
-  up: false,
-  down: false,
-  left: false,
-  right: false,
-  boost: false,
-};
+const WORLD = { width: 1800, height: 1200 };
+const keys = { up: false, down: false, left: false, right: false, boost: false };
 
 let gameRunning = false;
 let lastTime = 0;
-let missionTimer = 0;
-let currentMission = 0;
 let cash = 0;
 let heat = 0;
-let playerHP = 100;
+let hp = 100;
+let missionIndex = 0;
 let bestScore = 0;
+let currentMission = null;
+let missionToastTimer = 0;
 
 const player = {
-  x: 270,
-  y: 840,
-  radius: 18,
-  speed: 200,
-  boostSpeed: 340,
+  x: 180,
+  y: 340,
+  radius: 16,
+  speed: 220,
+  boost: 340,
   angle: 0,
   inCar: false,
-  carId: null,
 };
 
-const parkedCars = [
-  { x: 400, y: 1010, w: 56, h: 102, color: '#ff7e54', id: 'car_1' },
-  { x: 820, y: 960, w: 56, h: 102, color: '#63d0ff', id: 'car_2' },
-  { x: 1150, y: 1160, w: 56, h: 102, color: '#ffd166', id: 'car_3' },
-  { x: 1500, y: 930, w: 56, h: 102, color: '#72f0a6', id: 'car_4' },
-  { x: 930, y: 720, w: 56, h: 102, color: '#d57aff', id: 'car_5' },
-  { x: 1470, y: 680, w: 56, h: 102, color: '#7ab2ff', id: 'car_6' },
+const cars = [
+  { x: 420, y: 920, w: 58, h: 104, color: '#ff8a65', id: 'car1' },
+  { x: 820, y: 840, w: 58, h: 104, color: '#63d7ff', id: 'car2' },
+  { x: 1180, y: 980, w: 58, h: 104, color: '#ffd166', id: 'car3' },
+  { x: 1420, y: 660, w: 58, h: 104, color: '#8ee7a2', id: 'car4' }
 ];
 
-const missionTargets = [
-  { x: 520, y: 1180, label: 'Get package', reward: 120 },
-  { x: 1500, y: 710, label: 'Hit the safehouse', reward: 220 },
-  { x: 980, y: 300, label: 'Escape the zone', reward: 350 },
+const missions = [
+  { x: 560, y: 1030, label: 'Find Package', reward: 130 },
+  { x: 1460, y: 650, label: 'Hack the lockup', reward: 220 },
+  { x: 1200, y: 240, label: 'Beat the zone', reward: 350 },
+  { x: 200, y: 260, label: 'Escape city', reward: 500 }
 ];
 
 const police = [
-  { x: 1630, y: 390, radius: 16, color: '#ff6a74', speed: 170 },
-  { x: 1530, y: 1090, radius: 16, color: '#ff6a74', speed: 190 },
-  { x: 700, y: 460, radius: 16, color: '#ff6a74', speed: 180 },
+  { x: 1380, y: 300, r: 15, color: '#ff6d75', speed: 150 },
+  { x: 990, y: 910, r: 15, color: '#ff6d75', speed: 165 },
+  { x: 620, y: 520, r: 15, color: '#ff6d75', speed: 170 }
 ];
 
 const npcs = [
-  { x: 640, y: 820, name: 'Nova', color: '#82d8ff' },
-  { x: 1220, y: 850, name: 'Rift', color: '#ffd43d' },
-  { x: 1050, y: 1260, name: 'Zey', color: '#7af0b0' },
+  { x: 540, y: 760, name: 'Nova', color: '#82d8ff' },
+  { x: 860, y: 990, name: 'Zey', color: '#96ffb1' },
+  { x: 1300, y: 760, name: 'Rift', color: '#ffd76e' }
 ];
 
-let missionTarget = null;
-let lastMessage = '';
+function showToast(message) {
+  toastEl.textContent = message;
+  toastEl.classList.add('show');
+  clearTimeout(missionToastTimer);
+  missionToastTimer = setTimeout(() => toastEl.classList.remove('show'), 1500);
+}
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
-function showToast(msg) {
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  clearTimeout(showToast.timer);
-  showToast.timer = setTimeout(() => toastEl.classList.remove('show'), 1400);
+function updateHud() {
+  cashEl.textContent = '$' + cash;
+  heatEl.textContent = String(Math.round(heat));
+  hpEl.textContent = String(Math.max(0, Math.round(hp)));
+  missionTextEl.textContent = currentMission ? currentMission.label : 'Find Package';
 }
 
 function resetGame() {
   cash = 0;
   heat = 0;
-  playerHP = 100;
-  currentMission = 0;
-  player.x = 270;
-  player.y = 840;
+  hp = 100;
+  missionIndex = 0;
+  currentMission = missions[0];
+  player.x = 180;
+  player.y = 340;
   player.inCar = false;
-  player.carId = null;
-  missionTarget = { ...missionTargets[0] };
+  player.angle = 0;
   updateHud();
   showToast('Mission started');
 }
 
 function startGame() {
-  if (!gameRunning) {
-    gameRunning = true;
-    resetGame();
-    lastTime = 0;
-    requestAnimationFrame(loop);
-  }
-}
-
-function updateHud() {
-  cashEl.textContent = `$${cash}`;
-  heatEl.textContent = String(heat);
-  hpEl.textContent = String(Math.max(0, Math.round(playerHP)));
-  missionTextEl.textContent = missionTarget ? missionTarget.label : 'Escape';
-}
-
-function distance(a, b) {
-  return Math.hypot(a.x - b.x, a.y - b.y);
+  gameRunning = true;
+  resetGame();
+  lastTime = 0;
+  requestAnimationFrame(loop);
 }
 
 function tryEnterCar() {
-  const nearbyCar = parkedCars.find((car) => Math.hypot(player.x - car.x, player.y - car.y) < 70);
-  if (!nearbyCar) {
+  const nearby = cars.find((car) => Math.hypot(player.x - car.x, player.y - car.y) < 70);
+  if (!nearby) {
     if (player.inCar) {
       player.inCar = false;
-      player.carId = null;
       showToast('Exited vehicle');
-      return;
+    } else {
+      showToast('No car nearby');
     }
-    showToast('No car nearby');
     return;
   }
 
-  if (!player.inCar) {
-    player.inCar = true;
-    player.carId = nearbyCar.id;
-    showToast('Vehicle acquired');
-  } else {
-    player.inCar = false;
-    player.carId = null;
-    showToast('Exited vehicle');
-  }
+  player.inCar = !player.inCar;
+  showToast(player.inCar ? 'Vehicle acquired' : 'Exited vehicle');
 }
 
 function movePlayer(dt) {
@@ -149,295 +121,239 @@ function movePlayer(dt) {
   if (keys.up) moveY -= 1;
   if (keys.down) moveY += 1;
 
-  const len = Math.hypot(moveX, moveY) || 1;
-  moveX /= len;
-  moveY /= len;
-
-  let speed = player.speed;
-  if (keys.boost) speed *= 1.35;
-
-  if (player.inCar) {
-    speed *= 1.5;
-  }
-
-  player.x += moveX * speed * dt;
-  player.y += moveY * speed * dt;
-
   if (moveX || moveY) {
+    const len = Math.hypot(moveX, moveY) || 1;
+    moveX /= len;
+    moveY /= len;
+    const speed = keys.boost ? player.boost : player.speed;
+    const finalSpeed = player.inCar ? speed * 1.4 : speed;
+    player.x += moveX * finalSpeed * dt;
+    player.y += moveY * finalSpeed * dt;
     player.angle = Math.atan2(moveY, moveX);
   }
 
-  player.x = clamp(player.x, 26, world.width - 26);
-  player.y = clamp(player.y, 26, world.height - 26);
+  player.x = clamp(player.x, 26, WORLD.width - 26);
+  player.y = clamp(player.y, 26, WORLD.height - 26);
 }
 
 function updatePolice(dt) {
   police.forEach((cop) => {
     const dx = player.x - cop.x;
     const dy = player.y - cop.y;
-    const d = Math.hypot(dx, dy) || 1;
+    const dist = Math.hypot(dx, dy) || 1;
 
-    if (d < 260) {
-      cop.x += (dx / d) * cop.speed * dt;
-      cop.y += (dy / d) * cop.speed * dt;
-      if (d < 28) {
-        playerHP -= 15 * dt;
-        heat = clamp(heat + 4 * dt, 0, 5);
+    if (dist < 260) {
+      cop.x += (dx / dist) * cop.speed * dt;
+      cop.y += (dy / dist) * cop.speed * dt;
+
+      if (dist < 30) {
+        hp -= 18 * dt;
+        heat = clamp(heat + 2.5 * dt, 0, 5);
       }
     } else {
-      cop.x += Math.sin((performance.now() / 600) + cop.x) * 0.5;
-      cop.y += Math.cos((performance.now() / 700) + cop.y) * 0.5;
+      cop.x += Math.sin((performance.now() + cop.x * 4) / 800) * 0.6;
+      cop.y += Math.cos((performance.now() + cop.y * 3) / 900) * 0.6;
     }
 
-    cop.x = clamp(cop.x, 20, world.width - 20);
-    cop.y = clamp(cop.y, 20, world.height - 20);
+    cop.x = clamp(cop.x, 20, WORLD.width - 20);
+    cop.y = clamp(cop.y, 20, WORLD.height - 20);
   });
 
-  if (heat > 0) {
-    heat = Math.max(0, heat - 0.2 * dt);
-  }
+  heat = Math.max(0, heat - 0.18 * dt);
 }
 
-function updateMission(dt) {
-  const target = missionTargets[currentMission];
-  if (!target) return;
+function checkMission() {
+  if (!currentMission) return;
 
-  const d = distance(player, target);
-  if (d < 52) {
-    cash += target.reward;
+  const d = Math.hypot(player.x - currentMission.x, player.y - currentMission.y);
+  if (d < 55) {
+    cash += currentMission.reward;
     heat = clamp(heat + 1, 0, 5);
-    currentMission += 1;
+    missionIndex += 1;
 
-    if (currentMission < missionTargets.length) {
-      missionTarget = { ...missionTargets[currentMission] };
-      showToast('Mission complete! Next target');
+    if (missionIndex < missions.length) {
+      currentMission = missions[missionIndex];
+      showToast('Mission complete!');
     } else {
-      missionTarget = { x: 230, y: 880, label: 'Escape city', reward: 500 };
-      showToast('Final objective reached');
+      currentMission = { x: 180, y: 340, label: 'Escape city', reward: 600 };
+      showToast('Final objective');
+    }
+
+    if (missionIndex >= missions.length && Math.hypot(player.x - 180, player.y - 340) < 80) {
       bestScore = Math.max(bestScore, cash);
       gameRunning = false;
       startBtn.textContent = 'Play Again';
-      showToast('You won the district!');
+      showToast('You escaped the district');
     }
-  }
-
-  if (currentMission >= missionTargets.length && distance(player, { x: 230, y: 880 }) < 70) {
-    startBtn.textContent = 'Play Again';
-    showToast('Escape successful');
-    gameRunning = false;
   }
 
   updateHud();
 }
 
-function drawRoads() {
+function drawCity() {
+  ctx.fillStyle = '#0f1d2e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.save();
+  ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
+
+  // Roads
+  ctx.fillStyle = '#1b2d42';
   const roads = [
-    { x: 0, y: 360, w: 2000, h: 140 },
-    { x: 0, y: 980, w: 2000, h: 120 },
-    { x: 450, y: 0, w: 150, h: 1500 },
-    { x: 1090, y: 0, w: 150, h: 1500 },
-    { x: 1620, y: 0, w: 160, h: 1500 },
+    { x: 0, y: 290, w: 1800, h: 110 },
+    { x: 0, y: 820, w: 1800, h: 110 },
+    { x: 430, y: 0, w: 120, h: 1200 },
+    { x: 1040, y: 0, w: 120, h: 1200 },
+    { x: 1500, y: 0, w: 120, h: 1200 }
   ];
 
-  ctx.fillStyle = '#1e2e41';
-  roads.forEach((road) => {
-    ctx.fillRect(road.x, road.y, road.w, road.h);
+  roads.forEach((r) => {
+    ctx.fillRect(r.x, r.y, r.w, r.h);
   });
 
-  ctx.strokeStyle = '#f8d57e';
+  ctx.strokeStyle = '#e7d27b';
   ctx.lineWidth = 4;
-  ctx.setLineDash([22, 18]);
-  roads.forEach((road) => {
-    if (road.w > road.h) {
-      for (let x = 40; x < road.w; x += 80) {
+  ctx.setLineDash([20, 18]);
+  roads.forEach((r) => {
+    if (r.w > r.h) {
+      for (let x = 30; x < r.w; x += 70) {
         ctx.beginPath();
-        ctx.moveTo(road.x + x, road.y + road.h / 2);
-        ctx.lineTo(road.x + x + 30, road.y + road.h / 2);
+        ctx.moveTo(r.x + x, r.y + r.h / 2);
+        ctx.lineTo(r.x + x + 20, r.y + r.h / 2);
         ctx.stroke();
       }
     } else {
-      for (let y = 30; y < road.h; y += 80) {
+      for (let y = 24; y < r.h; y += 75) {
         ctx.beginPath();
-        ctx.moveTo(road.x + road.w / 2, road.y + y);
-        ctx.lineTo(road.x + road.w / 2, road.y + y + 30);
+        ctx.moveTo(r.x + r.w / 2, r.y + y);
+        ctx.lineTo(r.x + r.w / 2, r.y + y + 22);
         ctx.stroke();
       }
     }
   });
   ctx.setLineDash([]);
-}
 
-function drawBuildings() {
-  const blocks = [
-    { x: 100, y: 80, w: 220, h: 200 },
-    { x: 210, y: 540, w: 180, h: 180 },
-    { x: 620, y: 120, w: 250, h: 180 },
-    { x: 760, y: 620, w: 220, h: 210 },
-    { x: 1280, y: 120, w: 240, h: 180 },
-    { x: 1320, y: 600, w: 260, h: 210 },
-    { x: 100, y: 1150, w: 280, h: 200 },
-    { x: 720, y: 1160, w: 260, h: 170 },
-    { x: 1720, y: 1160, w: 200, h: 200 },
+  // Buildings
+  const buildings = [
+    { x: 80, y: 70, w: 200, h: 190 },
+    { x: 210, y: 520, w: 180, h: 180 },
+    { x: 620, y: 90, w: 240, h: 160 },
+    { x: 720, y: 570, w: 220, h: 180 },
+    { x: 1280, y: 120, w: 220, h: 180 },
+    { x: 1320, y: 560, w: 250, h: 210 },
+    { x: 70, y: 980, w: 260, h: 180 },
+    { x: 710, y: 980, w: 260, h: 170 },
+    { x: 1640, y: 980, w: 120, h: 160 }
   ];
 
-  ctx.fillStyle = '#172a3e';
-  blocks.forEach((b) => {
+  ctx.fillStyle = '#162b40';
+  buildings.forEach((b) => {
     ctx.fillRect(b.x, b.y, b.w, b.h);
-    ctx.strokeStyle = '#2a496f';
+    ctx.strokeStyle = '#2e4d6a';
     ctx.strokeRect(b.x, b.y, b.w, b.h);
   });
-}
 
-function drawMiniMap() {
-  const mapX = canvas.width - 120;
-  const mapY = 20;
+  // Mission marker
+  if (currentMission) {
+    ctx.fillStyle = '#72f0a6';
+    ctx.beginPath();
+    ctx.arc(currentMission.x, currentMission.y, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#edf7ff';
+    ctx.font = '12px Arial';
+    ctx.fillText(currentMission.label, currentMission.x + 18, currentMission.y + 4);
+  }
+
+  // Car objects
+  cars.forEach((car) => {
+    ctx.fillStyle = car.color;
+    ctx.fillRect(car.x - 28, car.y - 18, 56, 36);
+  });
+
+  // NPCs
+  npcs.forEach((npc) => {
+    ctx.fillStyle = npc.color;
+    ctx.beginPath();
+    ctx.arc(npc.x, npc.y, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#eaf1ff';
+    ctx.font = '10px Arial';
+    ctx.fillText(npc.name, npc.x + 14, npc.y + 4);
+  });
+
+  // Police
+  police.forEach((cop) => {
+    ctx.fillStyle = cop.color;
+    ctx.beginPath();
+    ctx.arc(cop.x, cop.y, cop.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+
+  // Player
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+  const drawX = centerX;
+  const drawY = centerY;
+
+  ctx.save();
+  ctx.translate(drawX, drawY);
+  ctx.rotate(player.angle);
+
+  if (player.inCar) {
+    ctx.fillStyle = '#ff8a65';
+    ctx.fillRect(-22, -14, 44, 28);
+    ctx.fillStyle = '#dfe9ff';
+    ctx.fillRect(-10, -4, 20, 8);
+  } else {
+    ctx.fillStyle = '#67dcff';
+    ctx.beginPath();
+    ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f7d36e';
+    ctx.fillRect(-4, -4, 8, 18);
+  }
+
+  ctx.restore();
+
+  // Minimap
+  const mapX = canvas.width - 115;
+  const mapY = 18;
   const mapW = 90;
   const mapH = 90;
-
-  ctx.fillStyle = 'rgba(10, 19, 29, 0.8)';
+  ctx.fillStyle = 'rgba(10, 20, 30, 0.8)';
   ctx.fillRect(mapX, mapY, mapW, mapH);
-  ctx.strokeStyle = '#6dd6ff';
+  ctx.strokeStyle = '#6ed8ff';
   ctx.strokeRect(mapX, mapY, mapW, mapH);
 
-  const px = mapX + (player.x / world.width) * mapW;
-  const py = mapY + (player.y / world.height) * mapH;
-
+  const px = mapX + (player.x / WORLD.width) * mapW;
+  const py = mapY + (player.y / WORLD.height) * mapH;
   ctx.fillStyle = '#f7c86c';
   ctx.beginPath();
   ctx.arc(px, py, 4, 0, Math.PI * 2);
   ctx.fill();
 }
 
-function drawMissionMarker() {
-  if (!missionTarget) return;
-
-  const x = missionTarget.x - player.x + canvas.width / 2;
-  const y = missionTarget.y - player.y + canvas.height / 2;
-
-  ctx.fillStyle = '#72f0a6';
-  ctx.beginPath();
-  ctx.arc(x, y, 12, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#dffff1';
-  ctx.stroke();
-
-  ctx.fillStyle = '#edf7ff';
-  ctx.font = '12px Arial';
-  ctx.fillText(missionTarget.label, x + 18, y + 4);
-}
-
-function drawPlayer() {
-  const centerX = canvas.width / 2;
-  const centerY = canvas.height / 2;
-  const screenX = player.x - (player.x - centerX);
-  const screenY = player.y - (player.y - centerY);
-
-  const vx = player.x - centerX;
-  const vy = player.y - centerY;
-  const drawX = centerX + vx;
-  const drawY = centerY + vy;
-
-  if (player.inCar) {
-    ctx.save();
-    ctx.translate(drawX, drawY);
-    ctx.rotate(player.angle);
-    ctx.fillStyle = '#ff7e54';
-    ctx.fillRect(-22, -14, 44, 28);
-    ctx.fillStyle = '#dcecff';
-    ctx.fillRect(-10, -3, 20, 7);
-    ctx.restore();
-  } else {
-    ctx.save();
-    ctx.translate(drawX, drawY);
-    ctx.rotate(player.angle);
-    ctx.fillStyle = '#63d9ff';
-    ctx.beginPath();
-    ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#efdb7b';
-    ctx.fillRect(-4, -4, 8, 18);
-    ctx.restore();
-  }
-}
-
-function drawCars() {
-  parkedCars.forEach((car) => {
-    const sx = car.x - player.x + canvas.width / 2;
-    const sy = car.y - player.y + canvas.height / 2;
-    ctx.fillStyle = car.color;
-    ctx.fillRect(sx - 28, sy - 14, 56, 28);
-  });
-
-  npcs.forEach((npc) => {
-    const sx = npc.x - player.x + canvas.width / 2;
-    const sy = npc.y - player.y + canvas.height / 2;
-    ctx.fillStyle = npc.color;
-    ctx.beginPath();
-    ctx.arc(sx, sy, 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#dcecff';
-    ctx.font = '10px Arial';
-    ctx.fillText(npc.name, sx + 12, sy + 4);
-  });
-}
-
-function drawPolice() {
-  police.forEach((cop) => {
-    const sx = cop.x - player.x + canvas.width / 2;
-    const sy = cop.y - player.y + canvas.height / 2;
-    ctx.fillStyle = '#ff6a74';
-    ctx.beginPath();
-    ctx.arc(sx, sy, cop.radius, 0, Math.PI * 2);
-    ctx.fill();
-  });
-}
-
-function drawWorld() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#0d1826';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  ctx.save();
-  ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
-  drawRoads();
-  drawBuildings();
-  drawCars();
-  drawPolice();
-  if (missionTarget) {
-    const markerX = missionTarget.x;
-    const markerY = missionTarget.y;
-    ctx.fillStyle = '#72f0a6';
-    ctx.beginPath();
-    ctx.arc(markerX, markerY, 18, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-
-  drawPlayer();
-  drawMiniMap();
-  drawMissionMarker();
-}
-
 function loop(timestamp) {
   if (!gameRunning) return;
 
   if (!lastTime) lastTime = timestamp;
-  const dt = Math.min((timestamp - lastTime) / 1000, 0.03);
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.033);
   lastTime = timestamp;
 
   movePlayer(dt);
   updatePolice(dt);
-  updateMission(dt);
+  checkMission();
 
-  if (playerHP <= 0) {
-    playerHP = 0;
+  if (hp <= 0) {
+    hp = 0;
     gameRunning = false;
     startBtn.textContent = 'Try Again';
-    showToast('You were busted');
+    showToast('Busted by police');
   }
 
-  updateHud();
-  drawWorld();
+  drawCity();
   requestAnimationFrame(loop);
 }
 
@@ -450,13 +366,11 @@ window.addEventListener('keydown', (event) => {
   if (event.key === 'ArrowDown' || key === 's') keys.down = true;
   if (key === 'shift') keys.boost = true;
   if (key === 'e') tryEnterCar();
-  if (event.code === 'Space') {
-    event.preventDefault();
-  }
 });
 
 window.addEventListener('keyup', (event) => {
   const key = event.key.toLowerCase();
+
   if (event.key === 'ArrowLeft' || key === 'a') keys.left = false;
   if (event.key === 'ArrowRight' || key === 'd') keys.right = false;
   if (event.key === 'ArrowUp' || key === 'w') keys.up = false;
@@ -466,12 +380,9 @@ window.addEventListener('keyup', (event) => {
 
 startBtn.addEventListener('click', () => {
   startBtn.textContent = 'Restart Mission';
-  gameRunning = true;
-  resetGame();
-  lastTime = 0;
-  requestAnimationFrame(loop);
+  startGame();
 });
 
-resetGame();
 updateHud();
-drawWorld();
+currentMission = missions[0];
+drawCity();
