@@ -1,42 +1,420 @@
-const canvas=document.getElementById('gameCanvas');
-const ctx=canvas.getContext('2d');
-const $=(id)=>document.getElementById(id);
-const WIDTH=canvas.width,HEIGHT=canvas.height;
-const STORAGE={best:'starFleetBestV1',profile:'starFleetProfileV1',friends:'starFleetFriendsV1',sound:'starFleetSoundV1',notice:'starFleetNoticeV1'};
-const safeRead=(key,fallback)=>{try{const value=localStorage.getItem(key);return value===null?fallback:JSON.parse(value)}catch{return fallback}};
-const safeWrite=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value))}catch{showToast('Tarayıcı kayıt alanına erişilemedi.')}};
-let score=0,lives=3,bestScore=Number(safeRead(STORAGE.best,0))||0,level=1,spawnTimer=0,lastTime=0,rafId=0,gameRunning=false,gameState='ready',soundOn=safeRead(STORAGE.sound,true)!==false,audioContext=null,toastTimer=0;
-let bullets=[],enemies=[],stars=[];
-const keys={left:false,right:false,shoot:false};
-const player={x:WIDTH/2-22,y:HEIGHT-70,width:44,height:30,speed:270,cooldown:0,invulnerable:0};
-const scoreEl=$('score'),livesEl=$('lives'),bestEl=$('bestScore'),overlay=$('gameOverlay');
-function formatScore(value){return String(value).padStart(5,'0')}
-function showToast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2800)}
-function playTone(freq=500,duration=.08,type='sine',volume=.035){if(!soundOn)return;try{audioContext=audioContext||new(window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')audioContext.resume();const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.type=type;osc.frequency.value=freq;gain.gain.setValueAtTime(volume,audioContext.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audioContext.currentTime+duration);osc.connect(gain);gain.connect(audioContext.destination);osc.start();osc.stop(audioContext.currentTime+duration)}catch{}}
-function updateScoreUI(){scoreEl.textContent=formatScore(score);const next=level*100,progress=score%100;$('levelLabel').textContent=String(level);$('sideLevel').textContent=String(level);$('sideBest').textContent=String(bestScore);$('levelProgress').style.width=`${progress}%`;$('nextLevelText').textContent=`${next-progress} puan`;bestEl.textContent=formatScore(bestScore)}
-function makeStars(){stars=Array.from({length:95},()=>({x:Math.random()*WIDTH,y:Math.random()*HEIGHT,r:Math.random()*1.7+.35,speed:25+Math.random()*75,alpha:.25+Math.random()*.75}))}
-function resetGame(){score=0;lives=3;level=1;bullets=[];enemies=[];spawnTimer=0;player.x=WIDTH/2-player.width/2;player.cooldown=0;player.invulnerable=0;makeStars();scoreEl.textContent=formatScore(score);livesEl.textContent=String(lives);updateScoreUI();gameState='playing';overlay.classList.add('hidden');$('overlayEyebrow').textContent='PİLOT, HAZIR MISIN?';$('overlayTitle').textContent='Görev başlıyor';$('overlayText').textContent='Yön tuşlarıyla kaçın, boşlukla düşmanları vur.';draw()}
-function startGame(){if(gameRunning)return;resetGame();gameRunning=true;lastTime=0;rafId=requestAnimationFrame(loop);playTone(540,.1,'triangle')}
-function endGame(){gameRunning=false;gameState='over';if(rafId)cancelAnimationFrame(rafId);if(score>bestScore){bestScore=score;safeWrite(STORAGE.best,bestScore);showToast('Yeni rekor! Harika uçuş pilot!');}updateScoreUI();draw();$('overlayEyebrow').textContent='GÖREV TAMAMLANDI';$('overlayTitle').textContent='Uçuş sona erdi';$('overlayText').textContent=`Skorun ${score}. Bir uçuş daha yapıp rekorunu kır!`;$('startBtn').innerHTML='<span>↻</span> TEKRAR UÇ';overlay.classList.remove('hidden');playTone(150,.35,'sawtooth',.04)}
-function spawnEnemy(){const size=26+Math.random()*20;enemies.push({x:Math.random()*(WIDTH-size),y:-size,width:size,height:size,speed:(85+Math.random()*42)*(1+(level-1)*.16),drift:(Math.random()-.5)*(28+level*5),phase:Math.random()*6})}
-function shoot(){bullets.push({x:player.x+player.width/2-2,y:player.y-10,width:4,height:14,speed:460})}
-function updatePlayer(dt){player.cooldown=Math.max(0,player.cooldown-dt);player.invulnerable=Math.max(0,player.invulnerable-dt);if(keys.left)player.x-=player.speed*dt;if(keys.right)player.x+=player.speed*dt;player.x=Math.max(5,Math.min(WIDTH-player.width-5,player.x));if(keys.shoot&&player.cooldown===0){shoot();player.cooldown=Math.max(.12,.25-(level-1)*.012);playTone(760,.045,'square',.012)}}
-function updateWorld(dt){stars.forEach(s=>{s.y+=s.speed*dt;if(s.y>HEIGHT){s.y=-2;s.x=Math.random()*WIDTH}});bullets=bullets.filter(b=>{b.y-=b.speed*dt;return b.y+b.height>0});spawnTimer+=dt;const interval=Math.max(.28,.92-(level-1)*.055);while(spawnTimer>=interval){spawnTimer-=interval;spawnEnemy()}enemies.forEach(e=>{e.y+=e.speed*dt;e.x+=e.drift*dt;if(e.x<0||e.x+e.width>WIDTH){e.drift*=-1;e.x=Math.max(0,Math.min(WIDTH-e.width,e.x))}})}
-function collides(a,b){return a.x<b.x+b.width&&a.x+a.width>b.x&&a.y<b.y+b.height&&a.y+a.height>b.y}
-function checkCollisions(){for(let i=bullets.length-1;i>=0;i--){let hit=false;for(let j=enemies.length-1;j>=0;j--){if(collides(bullets[i],enemies[j])){bullets.splice(i,1);enemies.splice(j,1);score+=10;hit=true;playTone(260,.07,'triangle',.03);break}}if(hit)continue}for(let i=enemies.length-1;i>=0;i--){const e=enemies[i];if(e.y>HEIGHT){enemies.splice(i,1);loseLife();continue}if(player.invulnerable===0&&collides(player,e)){enemies.splice(i,1);loseLife();if(!gameRunning)return}}const newLevel=Math.floor(score/100)+1;if(newLevel>level){level=newLevel;updateScoreUI();showLevelToast();playTone(900,.16,'triangle',.05)}if(score>bestScore){bestScore=score;bestEl.textContent=formatScore(bestScore);$('sideBest').textContent=String(bestScore)}}
-function loseLife(){lives--;livesEl.textContent=String(lives);player.invulnerable=1.1;playTone(110,.2,'sawtooth',.04);if(lives<=0)endGame()}
-let levelToastTimer=0;function showLevelToast(){const el=$('levelToast');el.textContent=`SEVİYE ${level}`;el.classList.add('show');clearTimeout(levelToastTimer);levelToastTimer=setTimeout(()=>el.classList.remove('show'),1500)}
-function loop(timestamp){if(!gameRunning)return;if(!lastTime)lastTime=timestamp;const dt=Math.min((timestamp-lastTime)/1000,.04);lastTime=timestamp;updatePlayer(dt);updateWorld(dt);checkCollisions();draw();if(gameRunning)rafId=requestAnimationFrame(loop)}
-function drawPlayer(){if(player.invulnerable>0&&Math.floor(player.invulnerable*12)%2===0)return;ctx.save();ctx.translate(player.x+player.width/2,player.y+player.height/2);ctx.shadowBlur=14;ctx.shadowColor='#69e0ff';ctx.fillStyle='#73e7ff';ctx.beginPath();ctx.moveTo(0,-player.height/2-4);ctx.lineTo(player.width/2,player.height/2);ctx.lineTo(0,player.height/2-7);ctx.lineTo(-player.width/2,player.height/2);ctx.closePath();ctx.fill();ctx.fillStyle='#eafaff';ctx.beginPath();ctx.ellipse(0,-2,4,8,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#ffbd68';ctx.shadowColor='#ff9155';ctx.beginPath();ctx.moveTo(-5,player.height/2-1);ctx.lineTo(0,player.height/2+9+Math.random()*4);ctx.lineTo(5,player.height/2-1);ctx.fill();ctx.restore()}
-function draw(){if(!ctx)return;ctx.clearRect(0,0,WIDTH,HEIGHT);const bg=ctx.createLinearGradient(0,0,0,HEIGHT);bg.addColorStop(0,'#071323');bg.addColorStop(1,'#122749');ctx.fillStyle=bg;ctx.fillRect(0,0,WIDTH,HEIGHT);stars.forEach(s=>{ctx.globalAlpha=s.alpha;ctx.fillStyle='#d9f3ff';ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,Math.PI*2);ctx.fill()});ctx.globalAlpha=1;bullets.forEach(b=>{ctx.shadowBlur=12;ctx.shadowColor='#6beaff';ctx.fillStyle='#c9faff';ctx.fillRect(b.x,b.y,b.width,b.height)});ctx.shadowBlur=0;enemies.forEach(e=>{ctx.save();ctx.translate(e.x+e.width/2,e.y+e.height/2);ctx.rotate(Math.sin(e.phase+e.y*.025)*.08);ctx.fillStyle='#ff668b';ctx.shadowBlur=12;ctx.shadowColor='#ff3e73';ctx.beginPath();ctx.moveTo(0,e.height/2);ctx.lineTo(-e.width/2,-e.height/2);ctx.lineTo(0,-e.height/4);ctx.lineTo(e.width/2,-e.height/2);ctx.closePath();ctx.fill();ctx.fillStyle='#ffd9e2';ctx.fillRect(-3,-e.height/3,6,6);ctx.restore()});drawPlayer();ctx.shadowBlur=0}
-function setKey(event,value){const key=event.key.toLowerCase();if(key==='arrowleft'||key==='a')keys.left=value;if(key==='arrowright'||key==='d')keys.right=value;if(event.code==='Space'){event.preventDefault();keys.shoot=value}}
-window.addEventListener('keydown',e=>{setKey(e,true);if(e.key==='Enter'&&!gameRunning&&gameState!=='playing')startGame()});window.addEventListener('keyup',e=>setKey(e,false));window.addEventListener('blur',()=>Object.keys(keys).forEach(k=>keys[k]=false));
-function bindHold(id,key){const button=$(id);const down=e=>{e.preventDefault();keys[key]=true;button.setPointerCapture?.(e.pointerId)};const up=e=>{e.preventDefault();keys[key]=false};button.addEventListener('pointerdown',down);['pointerup','pointercancel','lostpointercapture'].forEach(type=>button.addEventListener(type,up))}bindHold('leftBtn','left');bindHold('rightBtn','right');bindHold('fireBtn','shoot');
-$('startBtn').addEventListener('click',startGame);$('soundBtn').addEventListener('click',()=>{soundOn=!soundOn;safeWrite(STORAGE.sound,soundOn);$('soundBtn').textContent=soundOn?'♫ Ses açık':'♫ Ses kapalı';$('soundBtn').setAttribute('aria-pressed',String(soundOn));if(soundOn)playTone(600)});
-const profileDialog=$('profileDialog'),friendDialog=$('friendDialog'),notificationDialog=$('notificationDialog'),infoDialog=$('infoDialog');
-function getProfile(){return safeRead(STORAGE.profile,{name:'Pilot'})}function renderProfile(){const name=getProfile().name||'Pilot';$('profileLabel').textContent=name;$('avatar').textContent=name.trim().charAt(0).toUpperCase()||'P';$('pilotName').value=name==='Pilot'?'':name}renderProfile();$('profileBtn').addEventListener('click',()=>profileDialog.showModal());$('profileForm').addEventListener('submit',e=>{if(e.submitter?.classList.contains('close-button'))return;e.preventDefault();const name=$('pilotName').value.trim();if(!name)return;safeWrite(STORAGE.profile,{name});renderProfile();profileDialog.close();showToast(`Hoş geldin, ${name}!`)});$('googleSignInBtn').addEventListener('click',()=>showToast('Google Play Games girişi Android yapılandırması gerektirir.'));
-function renderFriends(){const list=$('friendsList'),friends=safeRead(STORAGE.friends,[]);list.replaceChildren();if(!friends.length){const empty=document.createElement('div');empty.className='empty-friends';empty.textContent='Ekibin burada görünecek';list.append(empty);return}friends.forEach(name=>{const row=document.createElement('div');row.className='friend-item';const avatar=document.createElement('span');avatar.className='friend-avatar';avatar.textContent=name.charAt(0).toUpperCase();const label=document.createElement('span');label.textContent=name;const status=document.createElement('span');status.className='friend-status';status.textContent='PİLOT';row.append(avatar,label,status);list.append(row)})}renderFriends();$('addFriendBtn').addEventListener('click',()=>friendDialog.showModal());$('friendForm').addEventListener('submit',e=>{if(e.submitter?.classList.contains('close-button'))return;e.preventDefault();const name=$('friendName').value.trim();if(!name)return;const friends=safeRead(STORAGE.friends,[]);if(friends.some(n=>n.toLowerCase()===name.toLowerCase())){showToast('Bu pilot zaten ekibinde.');return}friends.push(name);safeWrite(STORAGE.friends,friends);$('friendName').value='';friendDialog.close();renderFriends();showToast(`${name} ekibine eklendi.`)});
-$('notificationsBtn').addEventListener('click',()=>{notificationDialog.showModal();$('notificationStatus').textContent='Notification' in window?`Tarayıcı izni: ${Notification.permission}`:'Bu tarayıcı bildirimleri desteklemiyor.'});$('enableNotificationsBtn').addEventListener('click',async()=>{if(!('Notification'in window)){ $('notificationStatus').textContent='Tarayıcın bildirimleri desteklemiyor.';return}try{const permission=await Notification.requestPermission();$('notificationStatus').textContent=permission==='granted'?'Bildirim izni açık. Bu web demosu yalnızca yerel tarayıcı bildirimlerini destekler.':permission==='denied'?'İzin reddedildi. Tarayıcı ayarlarından değiştirebilirsin.':'İzin verilmedi.';if(permission==='granted'){safeWrite(STORAGE.notice,true);new Notification('Yıldız Filosu',{body:'Bildirimler açıldı, pilot. İyi uçuşlar!',icon:'./icon.svg'})}}catch{$('notificationStatus').textContent='Bildirimler yalnızca güvenli bağlantıda (HTTPS veya localhost) kullanılabilir.'}});
-$('playGamesBtn').addEventListener('click',()=>infoDialog.showModal());$('googleSignInBtn').addEventListener('click',()=>showToast('Google Play Games girişi Android yapılandırması gerektirir.'));
-const storedBest=Number(safeRead(STORAGE.best,0))||0;bestScore=storedBest;makeStars();updateScoreUI();$('soundBtn').textContent=soundOn?'♫ Ses açık':'♫ Ses kapalı';$('soundBtn').setAttribute('aria-pressed',String(soundOn));draw();
-if('serviceWorker'in navigator&&location.protocol.startsWith('http'))navigator.serviceWorker.register('./service-worker.js').catch(()=>{});
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+const cashEl = document.getElementById('cash');
+const heatEl = document.getElementById('heat');
+const hpEl = document.getElementById('hp');
+const missionTextEl = document.getElementById('missionText');
+const startBtn = document.getElementById('startBtn');
+const toastEl = document.getElementById('toast');
+
+const WORLD = { width: 1800, height: 1200 };
+const keys = { up: false, down: false, left: false, right: false, boost: false };
+
+let gameRunning = false;
+let lastTime = 0;
+let cash = 0;
+let heat = 0;
+let hp = 100;
+let missionIndex = 0;
+let bestScore = 0;
+let currentMission = null;
+let missionToastTimer = 0;
+let stars = [];
+
+const player = {
+  x: 180,
+  y: 340,
+  radius: 16,
+  speed: 220,
+  boost: 340,
+  angle: 0,
+  inCar: false,
+};
+
+const cars = [
+  { x: 420, y: 920, w: 58, h: 104, color: '#ff8a65', id: 'car1' },
+  { x: 820, y: 840, w: 58, h: 104, color: '#63d7ff', id: 'car2' },
+  { x: 1180, y: 980, w: 58, h: 104, color: '#ffd166', id: 'car3' },
+  { x: 1420, y: 660, w: 58, h: 104, color: '#8ee7a2', id: 'car4' }
+];
+
+const missions = [
+  { x: 560, y: 1030, label: 'Find Package', reward: 130 },
+  { x: 1460, y: 650, label: 'Hack the lockup', reward: 220 },
+  { x: 1200, y: 240, label: 'Beat the zone', reward: 350 },
+  { x: 200, y: 260, label: 'Escape city', reward: 500 }
+];
+
+const police = [
+  { x: 1380, y: 300, r: 15, color: '#ff6d75', speed: 150 },
+  { x: 990, y: 910, r: 15, color: '#ff6d75', speed: 165 },
+  { x: 620, y: 520, r: 15, color: '#ff6d75', speed: 170 }
+];
+
+const npcs = [
+  { x: 540, y: 760, name: 'Nova', color: '#82d8ff' },
+  { x: 860, y: 990, name: 'Zey', color: '#96ffb1' },
+  { x: 1300, y: 760, name: 'Rift', color: '#ffd76e' }
+];
+
+function showToast(message) {
+  toastEl.textContent = message;
+  toastEl.classList.add('show');
+  clearTimeout(missionToastTimer);
+  missionToastTimer = setTimeout(() => toastEl.classList.remove('show'), 1500);
+}
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function generateStars() {
+  stars = Array.from({ length: 120 }, () => ({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    size: Math.random() * 2.2 + 0.5,
+    speed: Math.random() * 0.3 + 0.15,
+    alpha: Math.random() * 0.7 + 0.25,
+  }));
+}
+
+function updateStars(dt) {
+  stars.forEach((star) => {
+    star.y += star.speed * 60 * dt;
+    if (star.y > canvas.height + 2) {
+      star.y = -4;
+      star.x = Math.random() * canvas.width;
+    }
+  });
+}
+
+function drawStars() {
+  stars.forEach((star) => {
+    ctx.fillStyle = `rgba(255,255,255,${star.alpha})`;
+    ctx.beginPath();
+    ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+    ctx.fill();
+  });
+}
+
+function updateHud() {
+  cashEl.textContent = '$' + cash;
+  heatEl.textContent = String(Math.round(heat));
+  hpEl.textContent = String(Math.max(0, Math.round(hp)));
+  missionTextEl.textContent = currentMission ? currentMission.label : 'Find Package';
+}
+
+function resetGame() {
+  cash = 0;
+  heat = 0;
+  hp = 100;
+  missionIndex = 0;
+  currentMission = missions[0];
+  player.x = 180;
+  player.y = 340;
+  player.inCar = false;
+  player.angle = 0;
+  updateHud();
+  showToast('Mission started');
+}
+
+function startGame() {
+  gameRunning = true;
+  resetGame();
+  lastTime = 0;
+  requestAnimationFrame(loop);
+}
+
+function tryEnterCar() {
+  const nearby = cars.find((car) => Math.hypot(player.x - car.x, player.y - car.y) < 70);
+  if (!nearby) {
+    if (player.inCar) {
+      player.inCar = false;
+      showToast('Exited vehicle');
+    } else {
+      showToast('No car nearby');
+    }
+    return;
+  }
+
+  player.inCar = !player.inCar;
+  showToast(player.inCar ? 'Vehicle acquired' : 'Exited vehicle');
+}
+
+function movePlayer(dt) {
+  let moveX = 0;
+  let moveY = 0;
+
+  if (keys.left) moveX -= 1;
+  if (keys.right) moveX += 1;
+  if (keys.up) moveY -= 1;
+  if (keys.down) moveY += 1;
+
+  if (moveX || moveY) {
+    const len = Math.hypot(moveX, moveY) || 1;
+    moveX /= len;
+    moveY /= len;
+    const speed = keys.boost ? player.boost : player.speed;
+    const finalSpeed = player.inCar ? speed * 1.4 : speed;
+    player.x += moveX * finalSpeed * dt;
+    player.y += moveY * finalSpeed * dt;
+    player.angle = Math.atan2(moveY, moveX);
+  }
+
+  player.x = clamp(player.x, 26, WORLD.width - 26);
+  player.y = clamp(player.y, 26, WORLD.height - 26);
+}
+
+function updatePolice(dt) {
+  police.forEach((cop) => {
+    const dx = player.x - cop.x;
+    const dy = player.y - cop.y;
+    const dist = Math.hypot(dx, dy) || 1;
+
+    if (dist < 260) {
+      cop.x += (dx / dist) * cop.speed * dt;
+      cop.y += (dy / dist) * cop.speed * dt;
+
+      if (dist < 30) {
+        hp -= 18 * dt;
+        heat = clamp(heat + 2.5 * dt, 0, 5);
+      }
+    } else {
+      cop.x += Math.sin((performance.now() + cop.x * 4) / 800) * 0.6;
+      cop.y += Math.cos((performance.now() + cop.y * 3) / 900) * 0.6;
+    }
+
+    cop.x = clamp(cop.x, 20, WORLD.width - 20);
+    cop.y = clamp(cop.y, 20, WORLD.height - 20);
+  });
+
+  heat = Math.max(0, heat - 0.18 * dt);
+}
+
+function checkMission() {
+  if (!currentMission) return;
+
+  const d = Math.hypot(player.x - currentMission.x, player.y - currentMission.y);
+  if (d < 55) {
+    cash += currentMission.reward;
+    heat = clamp(heat + 1, 0, 5);
+    missionIndex += 1;
+
+    if (missionIndex < missions.length) {
+      currentMission = missions[missionIndex];
+      showToast('Mission complete!');
+    } else {
+      currentMission = { x: 180, y: 340, label: 'Escape city', reward: 600 };
+      showToast('Final objective');
+    }
+
+    if (missionIndex >= missions.length && Math.hypot(player.x - 180, player.y - 340) < 80) {
+      bestScore = Math.max(bestScore, cash);
+      gameRunning = false;
+      startBtn.textContent = 'Play Again';
+      showToast('You escaped the district');
+    }
+  }
+
+  updateHud();
+}
+
+function drawCity() {
+  ctx.fillStyle = '#0f1d2e';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawStars();
+
+  ctx.save();
+  ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
+
+  // Roads
+  ctx.fillStyle = '#1b2d42';
+  const roads = [
+    { x: 0, y: 290, w: 1800, h: 110 },
+    { x: 0, y: 820, w: 1800, h: 110 },
+    { x: 430, y: 0, w: 120, h: 1200 },
+    { x: 1040, y: 0, w: 120, h: 1200 },
+    { x: 1500, y: 0, w: 120, h: 1200 }
+  ];
+
+  roads.forEach((r) => {
+    ctx.fillRect(r.x, r.y, r.w, r.h);
+  });
+
+  ctx.strokeStyle = '#e7d27b';
+  ctx.lineWidth = 4;
+  ctx.setLineDash([20, 18]);
+  roads.forEach((r) => {
+    if (r.w > r.h) {
+      for (let x = 30; x < r.w; x += 70) {
+        ctx.beginPath();
+        ctx.moveTo(r.x + x, r.y + r.h / 2);
+        ctx.lineTo(r.x + x + 20, r.y + r.h / 2);
+        ctx.stroke();
+      }
+    } else {
+      for (let y = 24; y < r.h; y += 75) {
+        ctx.beginPath();
+        ctx.moveTo(r.x + r.w / 2, r.y + y);
+        ctx.lineTo(r.x + r.w / 2, r.y + y + 22);
+        ctx.stroke();
+      }
+    }
+  });
+  ctx.setLineDash([]);
+
+  // Buildings
+  const buildings = [
+    { x: 80, y: 70, w: 200, h: 190 },
+    { x: 210, y: 520, w: 180, h: 180 },
+    { x: 620, y: 90, w: 240, h: 160 },
+    { x: 720, y: 570, w: 220, h: 180 },
+    { x: 1280, y: 120, w: 220, h: 180 },
+    { x: 1320, y: 560, w: 250, h: 210 },
+    { x: 70, y: 980, w: 260, h: 180 },
+    { x: 710, y: 980, w: 260, h: 170 },
+    { x: 1640, y: 980, w: 120, h: 160 }
+  ];
+
+  ctx.fillStyle = '#162b40';
+  buildings.forEach((b) => {
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle = '#2e4d6a';
+    ctx.strokeRect(b.x, b.y, b.w, b.h);
+  });
+
+  // Mission marker
+  if (currentMission) {
+    ctx.fillStyle = '#72f0a6';
+    ctx.beginPath();
+    ctx.arc(currentMission.x, currentMission.y, 18, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#edf7ff';
+    ctx.font = '12px Arial';
+    ctx.fillText(currentMission.label, currentMission.x + 18, currentMission.y + 4);
+  }
+
+  // Car objects
+  cars.forEach((car) => {
+    ctx.fillStyle = car.color;
+    ctx.fillRect(car.x - 28, car.y - 18, 56, 36);
+  });
+
+  // NPCs
+  npcs.forEach((npc) => {
+    ctx.fillStyle = npc.color;
+    ctx.beginPath();
+    ctx.arc(npc.x, npc.y, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#eaf1ff';
+    ctx.font = '10px Arial';
+    ctx.fillText(npc.name, npc.x + 14, npc.y + 4);
+  });
+
+  // Police
+  police.forEach((cop) => {
+    ctx.fillStyle = cop.color;
+    ctx.beginPath();
+    ctx.arc(cop.x, cop.y, cop.r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+
+  // Player
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.rotate(player.angle);
+
+  if (player.inCar) {
+    ctx.fillStyle = '#ff8a65';
+    ctx.fillRect(-22, -14, 44, 28);
+    ctx.fillStyle = '#dfe9ff';
+    ctx.fillRect(-10, -4, 20, 8);
+  } else {
+    ctx.fillStyle = '#67dcff';
+    ctx.beginPath();
+    ctx.arc(0, 0, player.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#f7d36e';
+    ctx.fillRect(-4, -4, 8, 18);
+  }
+
+  ctx.restore();
+
+  // Minimap
+  const mapX = canvas.width - 115;
+  const mapY = 18;
+  const mapW = 90;
+  const mapH = 90;
+  ctx.fillStyle = 'rgba(10, 20, 30, 0.8)';
+  ctx.fillRect(mapX, mapY, mapW, mapH);
+  ctx.strokeStyle = '#6ed8ff';
+  ctx.strokeRect(mapX, mapY, mapW, mapH);
+
+  const px = mapX + (player.x / WORLD.width) * mapW;
+  const py = mapY + (player.y / WORLD.height) * mapH;
+  ctx.fillStyle = '#f7c86c';
+  ctx.beginPath();
+  ctx.arc(px, py, 4, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function loop(timestamp) {
+  if (!gameRunning) return;
+
+  if (!lastTime) lastTime = timestamp;
+  const dt = Math.min((timestamp - lastTime) / 1000, 0.033);
+  lastTime = timestamp;
+
+  updateStars(dt);
+  movePlayer(dt);
+  updatePolice(dt);
+  checkMission();
+
+  if (hp <= 0) {
+    hp = 0;
+    gameRunning = false;
+    startBtn.textContent = 'Try Again';
+    showToast('Busted by police');
+  }
+
+  drawCity();
+  requestAnimationFrame(loop);
+}
+
+window.addEventListener('keydown', (event) => {
+  const key = event.key.toLowerCase();
+
+  if (event.key === 'ArrowLeft' || key === 'a') keys.left = true;
+  if (event.key === 'ArrowRight' || key === 'd') keys.right = true;
+  if (event.key === 'ArrowUp' || key === 'w') keys.up = true;
+  if (event.key === 'ArrowDown' || key === 's') keys.down = true;
+  if (key === 'shift') keys.boost = true;
+  if (key === 'e') tryEnterCar();
+});
+
+window.addEventListener('keyup', (event) => {
+  const key = event.key.toLowerCase();
+
+  if (event.key === 'ArrowLeft' || key === 'a') keys.left = false;
+  if (event.key === 'ArrowRight' || key === 'd') keys.right = false;
+  if (event.key === 'ArrowUp' || key === 'w') keys.up = false;
+  if (event.key === 'ArrowDown' || key === 's') keys.down = false;
+  if (key === 'shift') keys.boost = false;
+});
+
+startBtn.addEventListener('click', () => {
+  startBtn.textContent = 'Restart Mission';
+  startGame();
+});
+
+generateStars();
+updateHud();
+currentMission = missions[0];
+drawCity();
