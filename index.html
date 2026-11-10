@@ -1,136 +1,50 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#07111f" />
-    <meta name="description" content="Yıldızların arasında uç, düşmanları vur ve rekorunu kır!" />
-    <title>Yıldız Filosu — Uçak Oyunu</title>
-    <link rel="manifest" href="manifest.json" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0c1220" />
+    <title>Shadow District</title>
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="app-shell">
+    <div class="game-shell">
       <header class="topbar">
-        <a class="brand" href="#" aria-label="Yıldız Filosu ana sayfa">
-          <span class="brand-mark" aria-hidden="true">✦</span>
-          <span>YILDIZ <b>FİLOSU</b></span>
-        </a>
-        <div class="top-actions">
-          <button class="icon-button" id="notificationsBtn" type="button" aria-label="Bildirim ayarları" title="Bildirimler">♧</button>
-          <button class="profile-button" id="profileBtn" type="button"><span class="avatar" id="avatar">P</span><span id="profileLabel">Pilot</span></button>
+        <div class="brand-wrap">
+          <span class="brand-badge">S</span>
+          <div>
+            <div class="eyebrow">OPEN CITY</div>
+            <h1>Shadow District</h1>
+          </div>
+        </div>
+        <div class="profile-box">
+          <span class="avatar">K</span>
+          <span>Kaan</span>
         </div>
       </header>
 
-      <section class="intro">
-        <div>
-          <p class="eyebrow">GALAKSİ SENİ BEKLİYOR</p>
-          <h1>Gökyüzünü <span>fethet.</span></h1>
-          <p class="subtitle">Düşmanları alt et, seviyeni yükselt ve kendi rekorunu kır.</p>
+      <div class="hud">
+        <div class="stat"><span>Cash</span><strong id="cash">$0</strong></div>
+        <div class="stat"><span>Heat</span><strong id="heat">0</strong></div>
+        <div class="stat"><span>HP</span><strong id="hp">100</strong></div>
+        <div class="stat"><span>Target</span><strong id="missionText">Find Package</strong></div>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="gameCanvas" width="920" height="560"></canvas>
+        <div class="mission-toast" id="toast"></div>
+      </div>
+
+      <div class="controls">
+        <div class="keys">
+          <span>Move: WASD / Arrows</span>
+          <span>Enter Car: E</span>
+          <span>Boost: Shift</span>
         </div>
-        <div class="level-chip"><span class="level-icon">✧</span><span><small>MEVCUT SEVİYE</small><strong id="levelLabel">1</strong></span></div>
-      </section>
+        <button id="startBtn">Start Mission</button>
+      </div>
+    </div>
 
-      <section class="game-layout" aria-label="Uçak oyunu">
-        <div class="game-column">
-          <div class="hud">
-            <div class="stat"><span class="stat-icon score-icon">✦</span><span><small>SKOR</small><strong id="score">00000</strong></span></div>
-            <div class="stat"><span class="stat-icon heart-icon">♥</span><span><small>CAN</small><strong id="lives">3</strong></span></div>
-            <div class="stat"><span class="stat-icon trophy-icon">♛</span><span><small>REKOR</small><strong id="bestScore">00000</strong></span></div>
-          </div>
-          <div class="canvas-wrap">
-            <canvas id="gameCanvas" width="420" height="640" aria-label="Uçak oyunu alanı" tabindex="0"></canvas>
-            <div class="game-overlay" id="gameOverlay">
-              <div class="overlay-card">
-                <div class="hero-plane">✈</div>
-                <p class="eyebrow" id="overlayEyebrow">PİLOT, HAZIR MISIN?</p>
-                <h2 id="overlayTitle">Görev başlıyor</h2>
-                <p id="overlayText">Yön tuşlarıyla kaçın, boşlukla düşmanları vur.</p>
-                <button class="primary-button" id="startBtn" type="button"><span>▶</span> UÇUŞA BAŞLA</button>
-              </div>
-            </div>
-            <div class="level-toast" id="levelToast" aria-live="polite">SEVİYE 2</div>
-          </div>
-          <div class="game-controls">
-            <p><kbd>←</kbd> <kbd>→</kbd> veya <kbd>A</kbd> <kbd>D</kbd> <span>HAREKET</span></p>
-            <p><kbd>SPACE</kbd> <span>ATEŞ</span></p>
-            <button class="sound-button" id="soundBtn" type="button" aria-pressed="true">♫ Ses açık</button>
-          </div>
-          <div class="touch-controls" aria-label="Dokunmatik oyun kontrolleri">
-            <button id="leftBtn" type="button" aria-label="Sola git">←</button>
-            <button id="fireBtn" type="button" aria-label="Ateş et">ATEŞ</button>
-            <button id="rightBtn" type="button" aria-label="Sağa git">→</button>
-          </div>
-        </div>
-
-        <aside class="side-panel">
-          <section class="panel mission-panel">
-            <div class="panel-heading"><span>✦</span><h2>Uçuş Özeti</h2></div>
-            <div class="mission-row"><span>Seviye</span><strong id="sideLevel">1</strong></div>
-            <div class="progress-track"><span id="levelProgress"></span></div>
-            <div class="mission-row muted-row"><span>Sonraki seviyeye</span><span id="nextLevelText">100 puan</span></div>
-            <div class="divider"></div>
-            <div class="mission-row"><span>En iyi skorun</span><strong id="sideBest">0</strong></div>
-            <p class="panel-note">Her 100 puanda yeni bir seviye! Düşmanlar giderek hızlanır.</p>
-          </section>
-          <section class="panel friends-panel">
-            <div class="panel-heading"><span>♧</span><h2>Ekibin</h2><button class="text-button" id="addFriendBtn" type="button">+ Ekle</button></div>
-            <div id="friendsList" class="friends-list"></div>
-            <p class="panel-note">Pilot adını ekleyerek arkadaş listeni bu cihazda oluştur.</p>
-          </section>
-          <section class="panel play-panel">
-            <div class="play-badge">▶</div>
-            <div><strong>Google Play Games</strong><p>Android sürümünde kullanılabilir</p></div>
-            <button class="play-button" id="playGamesBtn" type="button" aria-label="Google Play Games hakkında bilgi">Bağla</button>
-          </section>
-        </aside>
-      </section>
-      <footer>YILDIZ FİLOSU <span>•</span> İyi uçuşlar, pilot!</footer>
-    </main>
-
-    <dialog id="profileDialog" class="modal">
-      <form method="dialog" id="profileForm">
-        <button class="close-button" aria-label="Kapat">×</button>
-        <div class="modal-icon">✦</div><p class="eyebrow">PİLOT KARTI</p><h2>Pilot profilin</h2>
-        <label for="pilotName">Oyunda kullanacağın ad</label>
-        <input id="pilotName" name="pilotName" maxlength="18" placeholder="Örn. YıldızPilot" autocomplete="nickname" required />
-        <p class="form-hint">Profilin şimdilik yalnızca bu tarayıcıda saklanır.</p>
-        <button class="primary-button" id="saveProfileBtn" type="submit">PROFİLİ KAYDET</button>
-        <button class="google-button" id="googleSignInBtn" type="button"><span>G</span> Google ile devam et</button>
-        <p class="form-hint">Google Play Games girişi için Android uygulaması, OAuth istemci kimliği ve Play Games Console yapılandırması gerekir.</p>
-      </form>
-    </dialog>
-
-    <dialog id="friendDialog" class="modal">
-      <form method="dialog" id="friendForm">
-        <button class="close-button" aria-label="Kapat">×</button>
-        <div class="modal-icon">♧</div><p class="eyebrow">FİLOYA DAVET</p><h2>Arkadaş ekle</h2>
-        <label for="friendName">Pilot adı</label>
-        <input id="friendName" name="friendName" maxlength="18" placeholder="Arkadaşının pilot adı" required />
-        <p class="form-hint">Bu demo sürümünde arkadaş listesi cihazında saklanır; davet gönderilmez.</p>
-        <button class="primary-button" type="submit">LİSTEYE EKLE</button>
-      </form>
-    </dialog>
-
-    <dialog id="notificationDialog" class="modal">
-      <form method="dialog">
-        <button class="close-button" aria-label="Kapat">×</button>
-        <div class="modal-icon">♧</div><p class="eyebrow">BİLDİRİMLER</p><h2>Uçuş haberleri</h2>
-        <p class="modal-copy">Tarayıcı bildirimi izni vererek bu cihazda oyun içi hatırlatmalar alabilirsin. Gerçek zamanlı arkadaş bildirimleri için sunucu kurulumu gerekir.</p>
-        <button class="primary-button" id="enableNotificationsBtn" type="button">BİLDİRİMLERİ AÇ</button>
-        <p class="form-hint" id="notificationStatus" aria-live="polite"></p>
-      </form>
-    </dialog>
-
-    <dialog id="infoDialog" class="modal">
-      <form method="dialog">
-        <button class="close-button" aria-label="Kapat">×</button>
-        <div class="modal-icon">▶</div><p class="eyebrow">GOOGLE PLAY GAMES</p><h2>Android sürümünde</h2>
-        <p class="modal-copy">Google Play Games oturumu için bu web oyununun Android uygulamasına dönüştürülmesi, Play Console'da oyun projesi açılması ve OAuth kimlik bilgilerinin güvenli şekilde yapılandırılması gerekir. Web demosu gerçek Google hesabı toplamaz.</p>
-        <button class="primary-button" type="submit">ANLADIM</button>
-      </form>
-    </dialog>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <script src="script.js"></script>
   </body>
 </html>
