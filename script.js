@@ -17,7 +17,6 @@ let cash = 0;
 let heat = 0;
 let hp = 100;
 let missionIndex = 0;
-let bestScore = 0;
 let currentMission = null;
 let missionToastTimer = 0;
 let stars = [];
@@ -210,7 +209,6 @@ function checkMission() {
     }
 
     if (missionIndex >= missions.length && Math.hypot(player.x - 180, player.y - 340) < 80) {
-      bestScore = Math.max(bestScore, cash);
       gameRunning = false;
       startBtn.textContent = 'Play Again';
       showToast('You escaped the district');
@@ -221,15 +219,12 @@ function checkMission() {
 }
 
 function drawCity() {
-  ctx.fillStyle = '#0f1d2e';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawStars();
 
   ctx.save();
   ctx.translate(canvas.width / 2 - player.x, canvas.height / 2 - player.y);
 
-  // Roads
   ctx.fillStyle = '#1b2d42';
   const roads = [
     { x: 0, y: 290, w: 1800, h: 110 },
@@ -265,7 +260,6 @@ function drawCity() {
   });
   ctx.setLineDash([]);
 
-  // Buildings
   const buildings = [
     { x: 80, y: 70, w: 200, h: 190 },
     { x: 210, y: 520, w: 180, h: 180 },
@@ -285,7 +279,6 @@ function drawCity() {
     ctx.strokeRect(b.x, b.y, b.w, b.h);
   });
 
-  // Mission marker
   if (currentMission) {
     ctx.fillStyle = '#72f0a6';
     ctx.beginPath();
@@ -296,13 +289,11 @@ function drawCity() {
     ctx.fillText(currentMission.label, currentMission.x + 18, currentMission.y + 4);
   }
 
-  // Car objects
   cars.forEach((car) => {
     ctx.fillStyle = car.color;
     ctx.fillRect(car.x - 28, car.y - 18, 56, 36);
   });
 
-  // NPCs
   npcs.forEach((npc) => {
     ctx.fillStyle = npc.color;
     ctx.beginPath();
@@ -313,7 +304,6 @@ function drawCity() {
     ctx.fillText(npc.name, npc.x + 14, npc.y + 4);
   });
 
-  // Police
   police.forEach((cop) => {
     ctx.fillStyle = cop.color;
     ctx.beginPath();
@@ -323,7 +313,6 @@ function drawCity() {
 
   ctx.restore();
 
-  // Player
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
 
@@ -347,7 +336,6 @@ function drawCity() {
 
   ctx.restore();
 
-  // Minimap
   const mapX = canvas.width - 115;
   const mapY = 18;
   const mapW = 90;
