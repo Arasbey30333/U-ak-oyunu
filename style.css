@@ -1,0 +1,97 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  --bg: #0b1020;
+  --panel: #131b2f;
+  --panel-alt: #1a2644;
+  --primary: #63d5ff;
+  --accent: #ffd166;
+  --danger: #ff6b6b;
+  --success: #7ee081;
+  --text: #edf6ff;
+  --muted: #a6bbd8;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at top, #162544 0%, var(--bg) 52%);
+  color: var(--text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+.game-shell {
+  background: rgba(19, 27, 47, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+  padding: 20px;
+  width: min(92vw, 460px);
+}
+
+h1 {
+  margin: 0 0 14px;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  text-align: center;
+  letter-spacing: 1px;
+}
+
+.hud {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+#score, #lives {
+  color: var(--text);
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+  background: linear-gradient(180deg, #091327 0%, #0d1832 38%, #1c2a52 100%);
+  border: 2px solid rgba(99, 213, 255, 0.4);
+  border-radius: 14px;
+}
+
+.actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+button {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+  background: linear-gradient(135deg, var(--primary), #3ca8ff);
+  color: #08121f;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button.secondary {
+  background: linear-gradient(135deg, var(--accent), #f7c75d);
+}
+
+.help {
+  margin: 14px 0 0;
+  font-size: 0.96rem;
+  color: var(--muted);
+  text-align: center;
+}
